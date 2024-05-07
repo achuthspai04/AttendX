@@ -4,15 +4,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten
 import cv2
 import numpy as np
-import firebase_admin
-from firebase_admin import credentials, firestore
+import sqlite3
 import datetime
-
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate("D:/AttendX/attend-x-3cb5f-firebase-adminsdk-r7yme-899df73190.json"
-)  # Replace with your service account key file path
-firebase_admin.initialize_app(cred)
-db = firestore.client()
 
 # Define the threshold for confidence scores
 confidence_threshold = 0.5  # Adjust this threshold as needed
@@ -29,14 +22,23 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fronta
 # Define class labels
 class_labels = ['vishnu', 'jopaul', 'unknown']
 
-# Define a function to add data to Firestore
-def add_data_to_firestore(name):
-    doc_ref = db.collection(u'attendances').document()
-    doc_ref.set({
-        u'name': name,
-        u'time': datetime.datetime.now()
-    })
-    print("Data added to Firestore:", name)
+# Define roll numbers
+roll_numbers = {'vishnu': 'SCM22CA031', 'jopaul': 'SCM22CA019'}
+
+# Initialize SQLite3 database connection
+conn = sqlite3.connect('attendance.db')
+cursor = conn.cursor()
+
+# Create a table if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS attendances
+                (name TEXT, roll_no TEXT, time TIMESTAMP)''')
+
+# Define a function to add data to SQLite3
+def add_data_to_sqlite(name, roll_no):
+    current_time = datetime.datetime.now()
+    cursor.execute("INSERT INTO attendances (name, roll_no, time) VALUES (?, ?, ?)", (name, roll_no, current_time))
+    conn.commit()
+    print("Data added to SQLite3:", name, roll_no)
 
 while True:
     ret, frame = cap.read()
@@ -66,20 +68,24 @@ while True:
         # Determine the label based on the predicted class and confidence score
         if confidence >= confidence_threshold:
             label = class_labels[predicted_class]
+            roll_no = roll_numbers.get(label, '')  # Get roll number corresponding to the label
         else:
             label = 'unknown'
+            roll_no = ''
         
         # Display the result on the frame
         cv2.putText(frame, f'{label} ({confidence:.2f})', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+        cv2.putText(frame, f'Roll No: {roll_no}', (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
         cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
         
-        # If the 'c' key is pressed, add data to Firestore
+        # If the 'c' key is pressed, add data to SQLite3
         if cv2.waitKey(1) & 0xFF == ord('c'):
-            add_data_to_firestore(label)
+            add_data_to_sqlite(label, roll_no)
     
     # Display the frame
     cv2.imshow('Face Recognition', frame)
     
+    # If the 'q' key is pressed, break out of the loop
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
