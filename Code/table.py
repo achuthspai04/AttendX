@@ -22,12 +22,12 @@ class AttendanceApp:
         # Fetch data from the database and insert into the Treeview
         self.fetch_data()
 
-    def fetch_data(self):
+    def fetch_data(self, query="SELECT * FROM attendances"):
         # Clear existing items in the Treeview
         self.tree.delete(*self.tree.get_children())
 
         # Fetch data from the database
-        self.cursor.execute("SELECT * FROM attendances")
+        self.cursor.execute(query)
         rows = self.cursor.fetchall()
 
         # Insert data into the Treeview
@@ -35,16 +35,15 @@ class AttendanceApp:
             self.tree.insert('', 'end', text=i+1, values=row)
 
     def sort_by_name(self):
-        self.cursor.execute("SELECT * FROM attendances ORDER BY Name")
-        self.fetch_data()
+        self.fetch_data("SELECT * FROM attendances ORDER BY Name")
 
     def sort_by_id(self):
-        self.cursor.execute("SELECT * FROM attendances ORDER BY ID")
-        self.fetch_data()
+    # This explicitly ensures sorting by ID as an integer (useful if IDs are stored as text)
+        self.fetch_data("SELECT * FROM attendances ORDER BY CAST(ID as INTEGER)")
+
 
     def sort_by_timestamp(self):
-        self.cursor.execute("SELECT * FROM attendances ORDER BY Timestamp")
-        self.fetch_data()
+        self.fetch_data("SELECT * FROM attendances ORDER BY Time")
 
 root = tk.Tk()
 app = AttendanceApp(root)
